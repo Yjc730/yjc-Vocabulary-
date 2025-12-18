@@ -6,55 +6,93 @@
   <title>My Vocab SRS</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
+
 <body>
-  <main class="container">
-    <header class="row">
-      <h1>My Vocab SRS</h1>
-      <div class="muted" id="stats"></div>
-    </header>
-
-    <section class="card">
-      <h2>新增單字</h2>
-      <div class="grid">
-        <input id="term" placeholder="term (e.g., catabolism)" />
-        <input id="pos" placeholder="pos (e.g., n.)" />
-        <input id="definition" placeholder="中文意思" />
-        <input id="example" placeholder="例句（可空）" />
-        <input id="tags" placeholder="tags（用逗號分隔，可空）" />
-      </div>
-      <button id="addBtn">加入</button>
-      <div class="muted" id="addMsg"></div>
-    </section>
-
-    <section class="card">
-      <div class="row between">
-        <h2>今日到期複習</h2>
-        <button id="reloadBtn" class="ghost">重新載入今日清單</button>
-      </div>
-
-      <div id="reviewBox" class="reviewBox hidden">
-        <div class="big" id="front"></div>
-        <div class="muted" id="sub"></div>
-
-        <button id="flipBtn">顯示答案</button>
-
-        <div id="backBox" class="hidden">
-          <div class="back">
-            <div id="back"></div>
-            <div class="muted" id="exampleOut"></div>
-            <div class="muted" id="tagsOut"></div>
-          </div>
-
-          <div class="row gap">
-            <button class="rate" data-score="0">0 忘了</button>
-            <button class="rate" data-score="1">1 很不熟</button>
-            <button class="rate" data-score="2">2 還行</button>
-            <button class="rate" data-score="3">3 很熟</button>
-          </div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo">Q</div>
+        <div>
+          <div class="title">My Vocab SRS</div>
+          <div class="subtitle" id="stats">載入中…</div>
         </div>
       </div>
 
-      <div id="empty" class="muted">今天沒有到期單字 🎉</div>
+      <div class="actions">
+        <button id="reloadBtn" class="btn btn-ghost">重新載入今日</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="study">
+      <div class="section-head">
+        <h2>今日複習</h2>
+        <div class="hint">點卡片翻面｜空白鍵翻面｜1 還不熟｜2 我會了</div>
+      </div>
+
+      <div id="empty" class="empty">
+        今天沒有到期單字 🎉
+      </div>
+
+      <div id="reviewBox" class="review hidden">
+        <div class="progress">
+          <span id="progressText">1 / 1</span>
+          <span class="pill" id="duePill">Due</span>
+        </div>
+
+        <button id="cardBtn" class="flashcard" type="button" aria-label="Flashcard">
+          <div class="front">
+            <div class="term" id="front">term</div>
+            <div class="muted" id="sub"></div>
+            <div class="tap">點一下顯示答案</div>
+          </div>
+
+          <div class="back">
+            <div class="def" id="back"></div>
+            <div class="meta" id="exampleOut"></div>
+            <div class="meta" id="tagsOut"></div>
+            <div class="tap">點一下回到題目</div>
+          </div>
+        </button>
+
+        <div class="rateRow">
+          <button class="btn btn-soft rate" data-score="1" type="button">還不熟</button>
+          <button class="btn btn-primary rate" data-score="3" type="button">我會了</button>
+        </div>
+
+        <details class="more">
+          <summary>更多評分選項（0~3）</summary>
+          <div class="rateRow">
+            <button class="btn btn-ghost rate" data-score="0" type="button">0 忘了</button>
+            <button class="btn btn-ghost rate" data-score="1" type="button">1 很不熟</button>
+            <button class="btn btn-ghost rate" data-score="2" type="button">2 還行</button>
+            <button class="btn btn-ghost rate" data-score="3" type="button">3 很熟</button>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="add">
+      <div class="section-head">
+        <h2>新增單字</h2>
+        <div class="hint">建議：term + 中文 + 例句（可空）</div>
+      </div>
+
+      <div class="panel">
+        <div class="grid">
+          <input id="term" placeholder="term (e.g., catabolism)" />
+          <input id="pos" placeholder="pos (e.g., n.)" />
+          <input id="definition" placeholder="中文意思" />
+          <input id="example" placeholder="例句（可空）" />
+          <input id="tags" class="span2" placeholder="tags（用逗號分隔，可空）" />
+        </div>
+
+        <div class="row">
+          <button id="addBtn" class="btn btn-primary" type="button">加入</button>
+          <div class="msg" id="addMsg"></div>
+        </div>
+      </div>
     </section>
   </main>
 

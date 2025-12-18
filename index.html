@@ -19,7 +19,8 @@
       </div>
 
       <nav class="tabs">
-        <button class="tab is-active" data-tab="study">Study</button>
+        <button class="tab is-active" data-tab="home">Home</button>
+        <button class="tab" data-tab="study">Study</button>
         <button class="tab" data-tab="add">Add</button>
         <button class="tab" data-tab="library">Library</button>
         <button class="tab" data-tab="backup">Backup</button>
@@ -28,6 +29,27 @@
   </header>
 
   <main class="container">
+
+    <!-- Home (Cards) -->
+<section id="tab-home" class="panel">
+  <div class="row between">
+    <h2>Home</h2>
+    <div class="hint">Folder → Set（點卡片直接開始複習 / 看單字薄）</div>
+  </div>
+
+  <div class="row wrap gap" style="margin-top:10px;">
+    <div class="field">
+      <label>Folder</label>
+      <select id="homeFolderSelect"></select>
+    </div>
+    <div class="field grow">
+      <label>搜尋 Set</label>
+      <input id="homeSearch" placeholder="輸入單元名稱，例如 Unit 5 / Ch.3…" />
+    </div>
+  </div>
+
+  <div id="cardsWrap" class="cardsWrap"></div>
+</section>
 
     <!-- Study -->
     <section id="tab-study" class="panel">

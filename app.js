@@ -1,7 +1,3 @@
-/* ===============================
-   修正版 app.js（Study 穩定）
-   =============================== */
-
 import {
   addFolder, getAllFolders,
   addSet, getAllSets, getSetsByFolder,
@@ -15,10 +11,91 @@ import { nextSRSState } from "./srs.js";
 
 const $ = (id) => document.getElementById(id);
 
-/* ===== DOM refs（略，與你原本一致） ===== */
-const els = { /* ⚠️ 此段保持你原本 */ };
+/* ===============================
+   DOM refs（完整保留）
+   =============================== */
+const els = {
+  stats: $("stats"),
 
-/* ===== 狀態 ===== */
+  tabs: document.querySelectorAll(".tab"),
+  panels: {
+    home: $("tab-home"),
+    study: $("tab-study"),
+    add: $("tab-add"),
+    library: $("tab-library"),
+    backup: $("tab-backup"),
+  },
+
+  homeFolderSelect: $("homeFolderSelect"),
+  homeSearch: $("homeSearch"),
+  cardsWrap: $("cardsWrap"),
+
+  reloadBtn: $("reloadBtn"),
+  studyFolderSelect: $("studyFolderSelect"),
+  studySetSelect: $("studySetSelect"),
+  modeSelect: $("modeSelect"),
+  empty: $("empty"),
+  reviewBox: $("reviewBox"),
+  progressText: $("progressText"),
+  cardBtn: $("cardBtn"),
+  front: $("front"),
+  frontSub: $("frontSub"),
+  back: $("back"),
+  exampleOut: $("exampleOut"),
+  tagsOut: $("tagsOut"),
+  todayText: $("todayText"),
+  todayDoneText: $("todayDoneText"),
+  todayBar: $("todayBar"),
+
+  addFolderSelect: $("addFolderSelect"),
+  newFolderName: $("newFolderName"),
+  createFolderBtn: $("createFolderBtn"),
+  addSetSelect: $("addSetSelect"),
+  newSetName: $("newSetName"),
+  createSetBtn: $("createSetBtn"),
+  examTitle: $("examTitle"),
+  examDate: $("examDate"),
+  saveExamBtn: $("saveExamBtn"),
+  examMsg: $("examMsg"),
+  term: $("term"),
+  pos: $("pos"),
+  definition: $("definition"),
+  example: $("example"),
+  tags: $("tags"),
+  addBtn: $("addBtn"),
+  addMsg: $("addMsg"),
+
+  libFolderSelect: $("libFolderSelect"),
+  libSetSelect: $("libSetSelect"),
+  libSearch: $("libSearch"),
+  libRefreshBtn: $("libRefreshBtn"),
+  libBody: $("libBody"),
+  viewTableBtn: $("viewTableBtn"),
+  viewNotebookBtn: $("viewNotebookBtn"),
+  printNotebookBtn: $("printNotebookBtn"),
+  tableView: $("tableView"),
+  notebookView: $("notebookView"),
+  notebookContent: $("notebookContent"),
+
+  editDialog: $("editDialog"),
+  editId: $("editId"),
+  editTerm: $("editTerm"),
+  editPos: $("editPos"),
+  editDef: $("editDef"),
+  editEx: $("editEx"),
+  editTags: $("editTags"),
+  saveEditBtn: $("saveEditBtn"),
+  editMsg: $("editMsg"),
+
+  exportBtn: $("exportBtn"),
+  importFile: $("importFile"),
+  importBtn: $("importBtn"),
+  backupMsg: $("backupMsg"),
+};
+
+/* ===============================
+   狀態
+   =============================== */
 let folders = [];
 let sets = [];
 let dueList = [];
@@ -28,8 +105,7 @@ let todayReviewed = 0;
 let libView = "table";
 
 /* ===============================
-   ✅ 修正 1：hydrateSelectors
-   正確還原 studyFolderId
+   hydrateSelectors（穩定版）
    =============================== */
 async function hydrateSelectors() {
   folders = (await getAllFolders()).sort((a,b)=>a.name.localeCompare(b.name));
@@ -40,104 +116,66 @@ async function hydrateSelectors() {
   const libFolder = (await getMeta("libFolderId")) ?? "all";
 
   fillSelect(els.studyFolderSelect, folders, {
-    includeAll:true,
-    allLabel:"All Folders",
-    selected: studyFolder
+    includeAll:true, allLabel:"All Folders", selected: studyFolder
   });
-
   fillSelect(els.addFolderSelect, folders, {
-    includeAll:false,
-    selected: folders[0]?.id ?? "all"
+    includeAll:false, selected: folders[0]?.id ?? "all"
   });
-
   fillSelect(els.libFolderSelect, folders, {
-    includeAll:true,
-    allLabel:"All Folders",
-    selected: libFolder
+    includeAll:true, allLabel:"All Folders", selected: libFolder
   });
-
   fillSelect(els.homeFolderSelect, folders, {
-    includeAll:true,
-    allLabel:"All Folders",
-    selected:"all"
+    includeAll:true, allLabel:"All Folders", selected:"all"
   });
 
   await refreshSetSelectsByFolder();
 
-  const mode = (await getMeta("studyMode")) ?? "en2zh";
-  els.modeSelect && (els.modeSelect.value = mode);
-
-  const lv = (await getMeta("libView")) ?? "table";
-  setLibView(lv);
-
+  els.modeSelect && (els.modeSelect.value = (await getMeta("studyMode")) ?? "en2zh");
+  setLibView((await getMeta("libView")) ?? "table");
   setActiveTab(activeTab);
 }
 
 /* ===============================
-   ✅ 修正 2：Study Folder change
-   一定存 meta + reload
+   Study reload（保證 reload）
    =============================== */
-els.studyFolderSelect?.addEventListener("change", async () => {
-  const fid = els.studyFolderSelect.value || "all";
-  await setMeta("studyFolderId", fid);
-  await refreshSetSelectsByFolder();
+async function reloadStudy() {
   idx = 0;
   flipped = false;
   await loadDue({ useSavedSession:false });
-});
+}
 
 /* ===============================
-   ✅ 修正 3：Home → Study
-   一定 reload due
+   Events（關鍵）
    =============================== */
+els.studyFolderSelect?.addEventListener("change", async () => {
+  await setMeta("studyFolderId", els.studyFolderSelect.value || "all");
+  await refreshSetSelectsByFolder();
+  await reloadStudy();
+});
+
+els.studySetSelect?.addEventListener("change", reloadStudy);
+els.reloadBtn?.addEventListener("click", reloadStudy);
+
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-home-act]");
   if (!btn) return;
 
-  const act = btn.dataset.homeAct;
   const setId = btn.dataset.set;
-
-  if (els.studySetSelect) {
-    els.studySetSelect.value = setId;
-    await setMeta("activeStudySetId", setId);
-  }
-
+  els.studySetSelect && (els.studySetSelect.value = setId);
   idx = 0;
   flipped = false;
 
-  if (act === "study") {
+  if (btn.dataset.homeAct === "study") {
     setActiveTab("study");
-    await loadDue({ useSavedSession:false });
-  }
-
-  if (act === "notebook") {
-    setActiveTab("library");
-    setLibView("notebook");
-    els.libSetSelect && (els.libSetSelect.value = setId);
-    await renderLibrary();
+    await reloadStudy();
   }
 });
 
 /* ===============================
-   ✅ 修正 4：today progress reset
-   =============================== */
-function renderTodayProgress() {
-  const done = todayReviewed;
-  const remain = dueList.length;
-  const total = done + remain;
-  const pct = total ? Math.round((done / total) * 100) : 0;
-
-  els.todayText && (els.todayText.textContent = `今日進度：${done} / ${total}`);
-  els.todayDoneText && (els.todayDoneText.textContent = `今日完成：${done}`);
-  els.todayBar && (els.todayBar.style.width = `${pct}%`);
-}
-
-/* ===============================
-   init（保持）
+   init
    =============================== */
 async function init() {
   await hydrateSelectors();
-  await refreshStats();
   await loadDue({ useSavedSession:true });
   await renderLibrary();
   await renderHomeCards();

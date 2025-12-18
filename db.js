@@ -1,5 +1,5 @@
 const DB_NAME = "vocab_srs_db";
-const DB_VER = 2;
+const DB_VER = 3;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -7,30 +7,73 @@ function openDB() {
 
     req.onupgradeneeded = () => {
       const db = req.result;
+      const tx = req.transaction;
 
-      // words store
+      // words
       let words;
       if (!db.objectStoreNames.contains("words")) {
         words = db.createObjectStore("words", { keyPath: "id" });
       } else {
-        words = req.transaction.objectStore("words");
+        words = tx.objectStore("words");
       }
-
-      // ensure indexes
       if (!words.indexNames.contains("dueAt")) words.createIndex("dueAt", "dueAt");
       if (!words.indexNames.contains("term")) words.createIndex("term", "term");
       if (!words.indexNames.contains("setId")) words.createIndex("setId", "setId");
 
-      // sets store
+      // sets
+      let sets;
       if (!db.objectStoreNames.contains("sets")) {
-        const sets = db.createObjectStore("sets", { keyPath: "id" });
+        sets = db.createObjectStore("sets", { keyPath: "id" });
         sets.createIndex("name", "name");
+      } else {
+        sets = tx.objectStore("sets");
+      }
+      if (!sets.indexNames.contains("folderId")) sets.createIndex("folderId", "folderId");
+
+      // folders
+      let folders;
+      if (!db.objectStoreNames.contains("folders")) {
+        folders = db.createObjectStore("folders", { keyPath: "id" });
+        folders.createIndex("name", "name");
+      } else {
+        folders = tx.objectStore("folders");
       }
 
-      // meta store
+      // meta
       if (!db.objectStoreNames.contains("meta")) {
         db.createObjectStore("meta", { keyPath: "key" });
       }
+
+      // ===== Migration: ensure there is at least one default folder, and sets have folderId =====
+      // Create default folder if none exists.
+      const defaultFolderId = "folder_default";
+      const foldersGet = folders.getAll();
+      foldersGet.onsuccess = () => {
+        const existing = foldersGet.result || [];
+        const hasDefault = existing.some(f => f.id === defaultFolderId);
+        if (!existing.length || !hasDefault) {
+          folders.put({ id: defaultFolderId, name: "Default Folder", createdAt: new Date().toISOString() });
+        }
+
+        // Assign folderId to sets that don't have it
+        const c = sets.openCursor();
+        c.onsuccess = () => {
+          const cur = c.result;
+          if (!cur) return;
+          const v = cur.value;
+          if (!v.folderId) {
+            v.folderId = defaultFolderId;
+            // exam fields default
+            if (typeof v.examTitle === "undefined") v.examTitle = "";
+            if (typeof v.examDate === "undefined") v.examDate = "";
+            cur.update(v);
+          } else {
+            if (typeof v.examTitle === "undefined") { v.examTitle = ""; cur.update(v); }
+            else if (typeof v.examDate === "undefined") { v.examDate = ""; cur.update(v); }
+          }
+          cur.continue();
+        };
+      };
     };
 
     req.onsuccess = () => resolve(req.result);
@@ -62,6 +105,27 @@ export async function getMeta(key) {
   });
 }
 
+/** Folders */
+export async function addFolder(folderObj) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const s = store(db, "folders", "readwrite");
+    const req = s.put(folderObj);
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getAllFolders() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const s = store(db, "folders");
+    const req = s.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 /** Sets */
 export async function addSet(setObj) {
   const db = await openDB();
@@ -81,6 +145,12 @@ export async function getAllSets() {
     req.onsuccess = () => resolve(req.result || []);
     req.onerror = () => reject(req.error);
   });
+}
+
+export async function getSetsByFolder(folderIdOrAll = "all") {
+  const sets = await getAllSets();
+  if (folderIdOrAll === "all") return sets;
+  return sets.filter(s => s.folderId === folderIdOrAll);
 }
 
 /** Words */
@@ -157,7 +227,6 @@ export async function getWordsBySet(setIdOrAll = "all") {
       req.onerror = () => reject(req.error);
     });
   }
-
   const idx = s.index("setId");
   const range = IDBKeyRange.only(setIdOrAll);
   return new Promise((resolve, reject) => {
@@ -170,6 +239,11 @@ export async function getWordsBySet(setIdOrAll = "all") {
 /** Backup */
 export async function exportAll() {
   const db = await openDB();
+  const folders = await new Promise((resolve, reject) => {
+    const req = store(db, "folders").getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
   const sets = await new Promise((resolve, reject) => {
     const req = store(db, "sets").getAll();
     req.onsuccess = () => resolve(req.result || []);
@@ -186,27 +260,23 @@ export async function exportAll() {
     req.onerror = () => reject(req.error);
   });
 
-  return {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    sets,
-    words,
-    meta,
-  };
+  return { version: 1, exportedAt: new Date().toISOString(), folders, sets, words, meta };
 }
 
 export async function importAll(payload) {
   const db = await openDB();
-  const tx = db.transaction(["sets", "words", "meta"], "readwrite");
+  const tx = db.transaction(["folders", "sets", "words", "meta"], "readwrite");
+  const foldersStore = tx.objectStore("folders");
   const setsStore = tx.objectStore("sets");
   const wordsStore = tx.objectStore("words");
   const metaStore = tx.objectStore("meta");
 
+  const folders = Array.isArray(payload?.folders) ? payload.folders : [];
   const sets = Array.isArray(payload?.sets) ? payload.sets : [];
   const words = Array.isArray(payload?.words) ? payload.words : [];
   const meta = Array.isArray(payload?.meta) ? payload.meta : [];
 
-  // upsert sets/words/meta
+  for (const f of folders) foldersStore.put(f);
   for (const s of sets) setsStore.put(s);
   for (const w of words) wordsStore.put(w);
   for (const m of meta) metaStore.put(m);

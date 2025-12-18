@@ -14,13 +14,20 @@ const $ = (id) => document.getElementById(id);
 const els = {
   stats: $("stats"),
 
+  // tabs & panels
   tabs: document.querySelectorAll(".tab"),
   panels: {
+    home: $("tab-home"),
     study: $("tab-study"),
     add: $("tab-add"),
     library: $("tab-library"),
     backup: $("tab-backup"),
   },
+
+  // Home cards
+  homeFolderSelect: $("homeFolderSelect"),
+  homeSearch: $("homeSearch"),
+  cardsWrap: $("cardsWrap"),
 
   // Study
   reloadBtn: $("reloadBtn"),
@@ -72,6 +79,7 @@ const els = {
   notebookView: $("notebookView"),
   notebookContent: $("notebookContent"),
 
+  // Edit modal
   editDialog: $("editDialog"),
   editId: $("editId"),
   editTerm: $("editTerm"),
@@ -96,14 +104,18 @@ let dueList = [];
 let idx = 0;
 let flipped = false;
 
-// 今日統計
-let todayDueStart = 0;       // 今日一開始的 due 總量（依目前範圍）
-let todayReviewed = 0;       // 今日你評分了幾張
+// 今日統計：你今天「評分」了幾張
+let todayReviewed = 0;
 
+// Library view
+let libView = "table"; // table | notebook
+
+// ---------- utils ----------
 function uid() {
   return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
 }
 function nowISO() { return new Date().toISOString(); }
+
 function todayKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -128,13 +140,28 @@ function fmtDate(iso) {
   } catch { return "-"; }
 }
 
+function escapeRegExp(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date();
+  const target = new Date(dateStr + "T00:00:00");
+  const base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diff = target.getTime() - base.getTime();
+  return Math.round(diff / (1000 * 60 * 60 * 24));
+}
+
 function setActiveTab(name) {
   for (const t of els.tabs) t.classList.toggle("is-active", t.dataset.tab === name);
-  for (const [k, p] of Object.entries(els.panels)) p.classList.toggle("hidden", k !== name);
+  for (const [k, p] of Object.entries(els.panels)) {
+    if (!p) continue;
+    p.classList.toggle("hidden", k !== name);
+  }
   setMeta("activeTab", name);
 }
 
 function fillSelect(select, items, { includeAll = true, allLabel = "All", selected = "all", textKey="name" } = {}) {
+  if (!select) return;
   select.innerHTML = "";
   if (includeAll) {
     const opt = document.createElement("option");
@@ -151,13 +178,46 @@ function fillSelect(select, items, { includeAll = true, allLabel = "All", select
   select.value = selected;
 }
 
+// ---------- session ----------
+async function saveSession() {
+  await setMeta("lastSession", { idx, flipped, ts: nowISO() });
+}
+async function loadSession() {
+  const s = await getMeta("lastSession");
+  if (!s) return;
+  idx = Number.isFinite(s.idx) ? s.idx : 0;
+  flipped = !!s.flipped;
+}
+
+// ---------- stats ----------
 async function refreshStats() {
   const total = await getAllCount();
   els.stats.textContent = `總單字：${total}`;
 }
 
-/** ===== Study: 卡片內容（模式） ===== */
-function escapeRegExp(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+// ---------- today progress ----------
+async function loadTodayProgress() {
+  const k = `todayReviewed:${todayKey()}`;
+  todayReviewed = (await getMeta(k)) ?? 0;
+  renderTodayProgress();
+}
+function renderTodayProgress() {
+  const done = todayReviewed;
+  const remain = dueList.length;
+  const totalPlan = done + remain;
+  const pct = totalPlan ? Math.round((done / totalPlan) * 100) : 0;
+
+  if (els.todayText) els.todayText.textContent = `今日進度：${done} / ${totalPlan}`;
+  if (els.todayDoneText) els.todayDoneText.textContent = `今日完成：${done}`;
+  if (els.todayBar) els.todayBar.style.width = `${pct}%`;
+}
+async function incTodayReviewed() {
+  const k = `todayReviewed:${todayKey()}`;
+  todayReviewed = (todayReviewed ?? 0) + 1;
+  await setMeta(k, todayReviewed);
+}
+
+// ---------- study card view ----------
 function clozeExample(term, example) {
   if (!example) return "(請先補例句才有挖空)";
   const re = new RegExp(`\\b${escapeRegExp(term)}\\b`, "gi");
@@ -200,79 +260,46 @@ function buildCardView(word, mode) {
   };
 }
 
-/** ===== 今日進度 UI ===== */
-async function loadTodayProgress() {
-  const k = `todayReviewed:${todayKey()}`;
-  todayReviewed = (await getMeta(k)) ?? 0;
-
-  // todayDueStart 會在 loadDue() 算
-  renderTodayProgress();
-}
-
-function renderTodayProgress() {
-  const done = todayReviewed;
-  const remain = dueList.length;
-  const totalPlan = done + remain; // 當下範圍下，已做 + 還沒做
-  const pct = totalPlan ? Math.round((done / totalPlan) * 100) : 0;
-
-  els.todayText.textContent = `今日進度：${done} / ${totalPlan}`;
-  els.todayDoneText.textContent = `今日完成：${done}`;
-  els.todayBar.style.width = `${pct}%`;
-}
-
-/** ===== Session ===== */
-async function saveSession() {
-  await setMeta("lastSession", { idx, flipped, ts: nowISO() });
-}
-async function loadSession() {
-  const s = await getMeta("lastSession");
-  if (!s) return;
-  idx = Number.isFinite(s.idx) ? s.idx : 0;
-  flipped = !!s.flipped;
-}
-
-/** ===== Study render ===== */
 function renderStudy() {
   if (!dueList.length) {
-    els.reviewBox.classList.add("hidden");
-    els.empty.classList.remove("hidden");
+    els.reviewBox?.classList.add("hidden");
+    els.empty?.classList.remove("hidden");
     renderTodayProgress();
     return;
   }
-  els.reviewBox.classList.remove("hidden");
-  els.empty.classList.add("hidden");
+  els.reviewBox?.classList.remove("hidden");
+  els.empty?.classList.add("hidden");
 
   if (idx >= dueList.length) idx = 0;
   const w = dueList[idx];
-  const mode = els.modeSelect.value;
+  const mode = els.modeSelect?.value || "en2zh";
 
-  els.progressText.textContent = `${idx + 1} / ${dueList.length}`;
+  if (els.progressText) els.progressText.textContent = `${idx + 1} / ${dueList.length}`;
 
   const view = buildCardView(w, mode);
-  els.front.textContent = view.front;
-  els.frontSub.textContent = view.frontSub;
-  els.back.textContent = view.back;
-  els.exampleOut.textContent = view.example || "";
-  els.tagsOut.textContent = view.tags || "";
+  if (els.front) els.front.textContent = view.front;
+  if (els.frontSub) els.frontSub.textContent = view.frontSub;
+  if (els.back) els.back.textContent = view.back;
+  if (els.exampleOut) els.exampleOut.textContent = view.example || "";
+  if (els.tagsOut) els.tagsOut.textContent = view.tags || "";
 
-  els.cardBtn.classList.toggle("is-flipped", flipped);
-
+  els.cardBtn?.classList.toggle("is-flipped", flipped);
   renderTodayProgress();
 }
 
 async function refreshSetSelectsByFolder() {
-  const studyFolderId = els.studyFolderSelect.value || "all";
-  const addFolderId = els.addFolderSelect.value || "all";
-  const libFolderId = els.libFolderSelect.value || "all";
+  // Study folder -> sets
+  const studyFolderId = els.studyFolderSelect?.value || "all";
+  const addFolderId = els.addFolderSelect?.value || "all";
+  const libFolderId = els.libFolderSelect?.value || "all";
 
   const studySets = await getSetsByFolder(studyFolderId);
   const addSets = await getSetsByFolder(addFolderId);
   const libSets = await getSetsByFolder(libFolderId);
 
-  // 保留原選擇（若仍存在）
-  const keepStudySet = els.studySetSelect.value || "all";
-  const keepAddSet = els.addSetSelect.value || (addSets[0]?.id ?? "all");
-  const keepLibSet = els.libSetSelect.value || "all";
+  const keepStudySet = els.studySetSelect?.value || "all";
+  const keepAddSet = els.addSetSelect?.value || (addSets[0]?.id ?? "all");
+  const keepLibSet = els.libSetSelect?.value || "all";
 
   fillSelect(els.studySetSelect, studySets, { includeAll: true, allLabel: "All Sets", selected: keepStudySet });
   fillSelect(els.addSetSelect, addSets, { includeAll: false, selected: keepAddSet });
@@ -280,13 +307,12 @@ async function refreshSetSelectsByFolder() {
 }
 
 async function loadDue({ useSavedSession = true } = {}) {
-  const setId = els.studySetSelect.value || "all";
+  const setId = els.studySetSelect?.value || "all";
   await setMeta("activeStudySetId", setId);
-  await setMeta("studyMode", els.modeSelect.value);
+  await setMeta("studyMode", els.modeSelect?.value || "en2zh");
 
   dueList = await getDueWords(nowISO(), setId);
 
-  // 今日計數：用 key 存
   await loadTodayProgress();
 
   if (!dueList.length) {
@@ -299,12 +325,6 @@ async function loadDue({ useSavedSession = true } = {}) {
   if (useSavedSession) await loadSession();
   if (idx >= dueList.length) idx = 0;
   renderStudy();
-}
-
-async function incTodayReviewed() {
-  const k = `todayReviewed:${todayKey()}`;
-  todayReviewed = (todayReviewed ?? 0) + 1;
-  await setMeta(k, todayReviewed);
 }
 
 async function rateCurrent(score) {
@@ -321,8 +341,10 @@ async function rateCurrent(score) {
   await saveSession();
 }
 
-/** ===== Swipe (mobile) ===== */
+// ---------- swipe support ----------
 function setupSwipe() {
+  if (!els.cardBtn) return;
+
   let startX = 0, startY = 0, dragging = false;
 
   els.cardBtn.addEventListener("pointerdown", (e) => {
@@ -337,8 +359,8 @@ function setupSwipe() {
     if (!dragging) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    // 避免垂直捲動干擾
     if (Math.abs(dy) > Math.abs(dx)) return;
+
     if (dx < -25) {
       els.cardBtn.classList.add("swipe-left");
       els.cardBtn.classList.remove("swipe-right");
@@ -357,9 +379,9 @@ function setupSwipe() {
     const dx = e.clientX - startX;
     els.cardBtn.classList.remove("swipe-left", "swipe-right");
 
-    // 門檻
-    if (dx < -80) return rateCurrent(1);   // 左滑：不熟
-    if (dx > 80)  return rateCurrent(3);   // 右滑：熟
+    // threshold
+    if (dx < -80) return rateCurrent(1); // left
+    if (dx > 80)  return rateCurrent(3); // right
   });
 
   els.cardBtn.addEventListener("pointercancel", () => {
@@ -368,19 +390,20 @@ function setupSwipe() {
   });
 }
 
-/** ===== Add: Folder/Set & exam ===== */
+// ---------- add: folder/set/exam/word ----------
 async function createFolder() {
-  const name = els.newFolderName.value.trim();
+  const name = els.newFolderName?.value?.trim();
   if (!name) return;
 
   await addFolder({ id: uid(), name, createdAt: nowISO() });
   els.newFolderName.value = "";
   await hydrateSelectors();
+  await renderHomeCards();
 }
 
 async function createSet() {
-  const folderId = els.addFolderSelect.value;
-  const name = els.newSetName.value.trim();
+  const folderId = els.addFolderSelect?.value;
+  const name = els.newSetName?.value?.trim();
   if (!folderId || !name) return;
 
   await addSet({
@@ -394,38 +417,43 @@ async function createSet() {
 
   els.newSetName.value = "";
   await hydrateSelectors(true);
+  await renderHomeCards();
 }
 
 async function saveExamForCurrentSet() {
-  const setId = els.addSetSelect.value;
+  const setId = els.addSetSelect?.value;
   if (!setId) return;
 
-  // 直接用 update 的方式：這裡簡單做「重寫 set 物件」
   const all = await getAllSets();
   const s = all.find(x => x.id === setId);
   if (!s) return;
 
-  s.examTitle = els.examTitle.value.trim();
-  s.examDate = els.examDate.value; // yyyy-mm-dd
+  s.examTitle = els.examTitle?.value?.trim() || "";
+  s.examDate = els.examDate?.value || "";
   await addSet(s);
 
-  els.examMsg.textContent = "已儲存本單元考試資訊 ✅";
-  setTimeout(() => (els.examMsg.textContent = ""), 1000);
+  if (els.examMsg) {
+    els.examMsg.textContent = "已儲存本單元考試資訊 ✅";
+    setTimeout(() => (els.examMsg.textContent = ""), 1000);
+  }
+
+  await renderHomeCards();
+  await renderNotebook();
 }
 
 async function addWordFromForm() {
-  const term = els.term.value.trim();
+  const term = els.term?.value?.trim();
   if (!term) return;
 
-  const setId = els.addSetSelect.value;
+  const setId = els.addSetSelect?.value;
   const word = {
     id: uid(),
     setId,
     term,
-    pos: els.pos.value.trim(),
-    definition: els.definition.value.trim(),
-    example: els.example.value.trim(),
-    tags: els.tags.value.split(",").map(s => s.trim()).filter(Boolean),
+    pos: els.pos?.value?.trim() || "",
+    definition: els.definition?.value?.trim() || "",
+    example: els.example?.value?.trim() || "",
+    tags: (els.tags?.value || "").split(",").map(s => s.trim()).filter(Boolean),
 
     repetitions: 0,
     intervalDays: 0,
@@ -437,30 +465,41 @@ async function addWordFromForm() {
 
   await addWord(word);
 
-  els.addMsg.textContent = `已加入：${term}`;
-  els.term.value = els.pos.value = els.definition.value = els.example.value = els.tags.value = "";
-  setTimeout(() => (els.addMsg.textContent = ""), 1000);
+  if (els.addMsg) {
+    els.addMsg.textContent = `已加入：${term}`;
+    setTimeout(() => (els.addMsg.textContent = ""), 1000);
+  }
+
+  if (els.term) els.term.value = "";
+  if (els.pos) els.pos.value = "";
+  if (els.definition) els.definition.value = "";
+  if (els.example) els.example.value = "";
+  if (els.tags) els.tags.value = "";
 
   await loadDue({ useSavedSession: false });
   await renderLibrary();
+  await renderHomeCards();
 }
 
-/** ===== Library (table + notebook) ===== */
-let libView = "table"; // table | notebook
-
+// ---------- library ----------
 function setLibView(v) {
   libView = v;
-  els.tableView.classList.toggle("hidden", v !== "table");
-  els.notebookView.classList.toggle("hidden", v !== "notebook");
-  els.viewTableBtn.classList.toggle("btn-soft", v === "table");
-  els.viewTableBtn.classList.toggle("btn-ghost", v !== "table");
-  els.viewNotebookBtn.classList.toggle("btn-soft", v === "notebook");
-  els.viewNotebookBtn.classList.toggle("btn-ghost", v !== "notebook");
+  els.tableView?.classList.toggle("hidden", v !== "table");
+  els.notebookView?.classList.toggle("hidden", v !== "notebook");
+
+  if (els.viewTableBtn) {
+    els.viewTableBtn.classList.toggle("btn-soft", v === "table");
+    els.viewTableBtn.classList.toggle("btn-ghost", v !== "table");
+  }
+  if (els.viewNotebookBtn) {
+    els.viewNotebookBtn.classList.toggle("btn-soft", v === "notebook");
+    els.viewNotebookBtn.classList.toggle("btn-ghost", v !== "notebook");
+  }
 }
 
 async function renderLibrary() {
-  const setId = els.libSetSelect.value || "all";
-  const q = els.libSearch.value.trim().toLowerCase();
+  const setId = els.libSetSelect?.value || "all";
+  const q = (els.libSearch?.value || "").trim().toLowerCase();
 
   const words = await getWordsBySet(setId);
   const filtered = q
@@ -475,45 +514,44 @@ async function renderLibrary() {
 
   filtered.sort((a,b) => String(a.term||"").localeCompare(String(b.term||"")));
 
-  // Table
-  els.libBody.innerHTML = "";
-  for (const w of filtered) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(w.term)}</td>
-      <td>${escapeHtml(w.pos)}</td>
-      <td>${escapeHtml(w.definition)}</td>
-      <td>${escapeHtml((w.tags||[]).join(", "))}</td>
-      <td>${escapeHtml(fmtDate(w.dueAt))}</td>
-      <td>
-        <button class="btn btn-ghost mini" data-act="edit" data-id="${w.id}">編輯</button>
-        <button class="btn btn-ghost mini danger" data-act="del" data-id="${w.id}">刪除</button>
-      </td>
-    `;
-    els.libBody.appendChild(tr);
+  // table
+  if (els.libBody) {
+    els.libBody.innerHTML = "";
+    for (const w of filtered) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(w.term)}</td>
+        <td>${escapeHtml(w.pos)}</td>
+        <td>${escapeHtml(w.definition)}</td>
+        <td>${escapeHtml((w.tags||[]).join(", "))}</td>
+        <td>${escapeHtml(fmtDate(w.dueAt))}</td>
+        <td>
+          <button class="btn btn-ghost mini" data-act="edit" data-id="${w.id}">編輯</button>
+          <button class="btn btn-ghost mini danger" data-act="del" data-id="${w.id}">刪除</button>
+        </td>
+      `;
+      els.libBody.appendChild(tr);
+    }
   }
 
-  // Notebook
   await renderNotebook();
-
   await refreshStats();
 }
 
 async function renderNotebook() {
-  // Notebook：依「Folder / Set」顯示成單字薄（term/pos/中文）
-  const folderId = els.libFolderSelect.value || "all";
-  const setId = els.libSetSelect.value || "all";
+  if (!els.notebookContent) return;
+
+  const folderId = els.libFolderSelect?.value || "all";
+  const setId = els.libSetSelect?.value || "all";
 
   const folder = folders.find(f => f.id === folderId);
   const showingFolderName = folderId === "all" ? "All Folders" : (folder?.name ?? "Folder");
   const showingSetName = setId === "all" ? "All Sets" : (sets.find(s => s.id === setId)?.name ?? "Set");
 
-  // 取 sets 範圍
   const scopedSets = (setId !== "all")
     ? sets.filter(s => s.id === setId)
     : (folderId === "all" ? sets : sets.filter(s => s.folderId === folderId));
 
-  // 產生內容
   let html = `
     <div class="nbHeader">
       <div>
@@ -555,7 +593,105 @@ async function renderNotebook() {
   els.notebookContent.innerHTML = html;
 }
 
-/** ===== Backup ===== */
+// ---------- home cards ----------
+async function renderHomeCards() {
+  if (!els.cardsWrap || !els.homeFolderSelect) return;
+
+  const folderId = els.homeFolderSelect.value || "all";
+  const q = (els.homeSearch?.value || "").trim().toLowerCase();
+
+  let scopedSets = (folderId === "all")
+    ? sets
+    : sets.filter(s => s.folderId === folderId);
+
+  if (q) scopedSets = scopedSets.filter(s => (s.name || "").toLowerCase().includes(q));
+
+  const now = nowISO();
+  const rows = [];
+  for (const s of scopedSets) {
+    const words = await getWordsBySet(s.id);
+    const due = (await getDueWords(now, s.id)).length;
+
+    const dleft = daysUntil(s.examDate);
+    const examBadge =
+      s.examDate
+        ? (dleft < 0 ? { text: "考試已過", cls: "badge" }
+          : dleft === 0 ? { text: "今天考試", cls: "badge red" }
+          : { text: `倒數 ${dleft} 天`, cls: "badge red" })
+        : null;
+
+    rows.push({
+      set: s,
+      wordCount: words.length,
+      dueCount: due,
+      examBadge,
+    });
+  }
+
+  rows.sort((a,b) => {
+    if (b.dueCount !== a.dueCount) return b.dueCount - a.dueCount;
+    const ad = daysUntil(a.set.examDate) ?? 99999;
+    const bd = daysUntil(b.set.examDate) ?? 99999;
+    return ad - bd;
+  });
+
+  const folderName = folderId === "all"
+    ? "All Folders"
+    : (folders.find(f => f.id === folderId)?.name ?? "Folder");
+
+  els.cardsWrap.innerHTML = `
+    <div class="folderBar" style="grid-column:1/-1;">
+      <div class="folderTitle">${escapeHtml(folderName)}</div>
+      <div class="folderMeta">Sets：${rows.length}</div>
+    </div>
+  `;
+
+  if (!rows.length) {
+    els.cardsWrap.innerHTML += `<div class="empty" style="grid-column:1/-1;">這個 Folder 目前沒有 Set（去 Add 建一個）</div>`;
+    return;
+  }
+
+  for (const r of rows) {
+    const s = r.set;
+    const dueBadge = r.dueCount > 0
+      ? `<span class="badge blue">今日到期 ${r.dueCount}</span>`
+      : `<span class="badge">今日到期 0</span>`;
+
+    const examTitle = (s.examTitle || "").trim();
+    const examBadge = r.examBadge ? `<span class="${r.examBadge.cls}">${escapeHtml(r.examBadge.text)}</span>` : "";
+    const examLine = (examTitle || s.examDate)
+      ? `考試：${escapeHtml(examTitle || "-")} ${s.examDate ? `(${escapeHtml(s.examDate)})` : ""}`
+      : "考試：未設定";
+
+    const card = document.createElement("div");
+    card.className = "setCard";
+    card.innerHTML = `
+      <div class="setTop">
+        <div>
+          <div class="setName">${escapeHtml(s.name)}</div>
+          <div class="small">${escapeHtml(examLine)}</div>
+        </div>
+        <div class="badges">
+          ${dueBadge}
+          ${examBadge}
+        </div>
+      </div>
+
+      <div class="cardStats">
+        <div>單字：<b>${r.wordCount}</b></div>
+        <div>Folder：<b>${escapeHtml(folderName)}</b></div>
+      </div>
+
+      <div class="cardActions">
+        <button class="btn btn-primary" data-home-act="study" data-set="${s.id}" type="button">開始複習</button>
+        <button class="btn btn-soft" data-home-act="notebook" data-set="${s.id}" type="button">看單字薄</button>
+      </div>
+    `;
+    els.cardsWrap.appendChild(card);
+  }
+}
+
+// ---------- backup ----------
 function downloadJSON(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -568,82 +704,126 @@ function downloadJSON(obj, filename) {
   URL.revokeObjectURL(url);
 }
 
-/** ===== hydration ===== */
-async function hydrateSelectors(keepAddSetNew = false) {
+// ---------- hydrate selectors ----------
+async function hydrateSelectors() {
   folders = (await getAllFolders()).sort((a,b) => a.name.localeCompare(b.name));
   sets = (await getAllSets()).sort((a,b) => a.name.localeCompare(b.name));
 
-  // default selections
-  const activeTab = (await getMeta("activeTab")) ?? "study";
+  // default tab
+  const activeTab = (await getMeta("activeTab")) ?? "home";
+
   const studyFolder = (await getMeta("studyFolderId")) ?? "all";
   const libFolder = (await getMeta("libFolderId")) ?? "all";
 
+  // folder selects
   fillSelect(els.studyFolderSelect, folders, { includeAll:true, allLabel:"All Folders", selected: studyFolder });
   fillSelect(els.addFolderSelect, folders, { includeAll:false, selected: folders[0]?.id ?? "all" });
   fillSelect(els.libFolderSelect, folders, { includeAll:true, allLabel:"All Folders", selected: libFolder });
+  fillSelect(els.homeFolderSelect, folders, { includeAll:true, allLabel:"All Folders", selected: "all" });
 
+  // set selects based on folder
   await refreshSetSelectsByFolder();
 
   // mode restore
   const mode = (await getMeta("studyMode")) ?? "en2zh";
-  els.modeSelect.value = mode;
+  if (els.modeSelect) els.modeSelect.value = mode;
 
-  // apply lib view restore
+  // library view restore
   const lv = (await getMeta("libView")) ?? "table";
   setLibView(lv);
-
-  // if just created set, keep it selected in add
-  if (keepAddSetNew) {
-    // nothing needed; addSetSelect already refreshed by folder
-  }
 
   setActiveTab(activeTab);
 }
 
-/** ===== events ===== */
+// ---------- events ----------
 for (const t of els.tabs) {
   t.addEventListener("click", async () => {
     setActiveTab(t.dataset.tab);
-    if (t.dataset.tab === "library") await renderLibrary();
+
+    if (t.dataset.tab === "home") {
+      await renderHomeCards();
+    }
+    if (t.dataset.tab === "library") {
+      await renderLibrary();
+    }
   });
 }
 
+// Home filters
+els.homeFolderSelect?.addEventListener("change", async () => {
+  await renderHomeCards();
+});
+els.homeSearch?.addEventListener("input", () => {
+  clearTimeout(window.__homeT);
+  window.__homeT = setTimeout(renderHomeCards, 150);
+});
+
+// Home card actions
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-home-act]");
+  if (!btn) return;
+
+  const act = btn.dataset.homeAct;
+  const setId = btn.dataset.set;
+
+  // 切到指定 set（Study）
+  if (els.studySetSelect) els.studySetSelect.value = setId;
+
+  idx = 0; flipped = false;
+  await saveSession();
+
+  if (act === "study") {
+    setActiveTab("study");
+    await loadDue({ useSavedSession: false });
+    return;
+  }
+
+  if (act === "notebook") {
+    setActiveTab("library");
+    if (els.libSetSelect) els.libSetSelect.value = setId;
+    setLibView("notebook");
+    await setMeta("libView", "notebook");
+    await renderLibrary();
+    return;
+  }
+});
+
 // Study filters
-els.studyFolderSelect.addEventListener("change", async () => {
+els.studyFolderSelect?.addEventListener("change", async () => {
   await setMeta("studyFolderId", els.studyFolderSelect.value || "all");
   await refreshSetSelectsByFolder();
   idx = 0; flipped = false;
   await saveSession();
   await loadDue({ useSavedSession: false });
 });
-els.studySetSelect.addEventListener("change", async () => {
+els.studySetSelect?.addEventListener("change", async () => {
   idx = 0; flipped = false;
   await saveSession();
   await loadDue({ useSavedSession: false });
 });
-els.modeSelect.addEventListener("change", async () => {
+els.modeSelect?.addEventListener("change", async () => {
   await setMeta("studyMode", els.modeSelect.value);
   flipped = false;
   await saveSession();
   renderStudy();
 });
 
-els.reloadBtn.onclick = async () => {
+els.reloadBtn && (els.reloadBtn.onclick = async () => {
   idx = 0; flipped = false;
   await saveSession();
   await loadDue({ useSavedSession: false });
-};
+});
 
-els.cardBtn.onclick = async () => {
+els.cardBtn && (els.cardBtn.onclick = async () => {
   flipped = !flipped;
   await saveSession();
   renderStudy();
-};
+});
 
-// Rate buttons
+// Rate buttons + library actions (edit/del)
 document.addEventListener("click", async (e) => {
-  const btn = e.target.closest(".rate");
-  if (btn) return rateCurrent(Number(btn.dataset.score));
+  const rateBtn = e.target.closest(".rate");
+  if (rateBtn) return rateCurrent(Number(rateBtn.dataset.score));
 
   const act = e.target.closest("[data-act]")?.dataset.act;
   const id = e.target.closest("[data-id]")?.dataset.id;
@@ -655,11 +835,12 @@ document.addEventListener("click", async (e) => {
     await deleteWord(id);
     await renderLibrary();
     await loadDue({ useSavedSession: false });
+    await renderHomeCards();
     return;
   }
 
   if (act === "edit") {
-    const setId = els.libSetSelect.value || "all";
+    const setId = els.libSetSelect?.value || "all";
     const words = await getWordsBySet(setId);
     const w = words.find(x => x.id === id) || (await getWordsBySet("all")).find(x => x.id === id);
     if (!w) return;
@@ -675,7 +856,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-els.saveEditBtn.onclick = async () => {
+els.saveEditBtn && (els.saveEditBtn.onclick = async () => {
   const id = els.editId.value;
   if (!id) return;
 
@@ -690,67 +871,81 @@ els.saveEditBtn.onclick = async () => {
   els.editMsg.textContent = "已儲存 ✅";
   await renderLibrary();
   await loadDue({ useSavedSession: false });
+  await renderHomeCards();
 
   setTimeout(() => (els.editMsg.textContent = ""), 900);
-};
+});
 
 // Add: folder/set
-els.createFolderBtn.onclick = createFolder;
-els.addFolderSelect.addEventListener("change", async () => {
+els.createFolderBtn && (els.createFolderBtn.onclick = createFolder);
+els.addFolderSelect?.addEventListener("change", async () => {
   await refreshSetSelectsByFolder();
 });
 
-els.createSetBtn.onclick = createSet;
-els.addSetSelect.addEventListener("change", async () => {
-  // 填回 set 的考試資訊
+els.createSetBtn && (els.createSetBtn.onclick = createSet);
+
+els.addSetSelect?.addEventListener("change", async () => {
   const s = (await getAllSets()).find(x => x.id === els.addSetSelect.value);
-  els.examTitle.value = s?.examTitle || "";
-  els.examDate.value = s?.examDate || "";
+  if (els.examTitle) els.examTitle.value = s?.examTitle || "";
+  if (els.examDate) els.examDate.value = s?.examDate || "";
 });
 
-els.saveExamBtn.onclick = saveExamForCurrentSet;
-els.addBtn.onclick = addWordFromForm;
+els.saveExamBtn && (els.saveExamBtn.onclick = saveExamForCurrentSet);
+els.addBtn && (els.addBtn.onclick = addWordFromForm);
 
 // Library filters
-els.libFolderSelect.addEventListener("change", async () => {
+els.libFolderSelect?.addEventListener("change", async () => {
   await setMeta("libFolderId", els.libFolderSelect.value || "all");
   await refreshSetSelectsByFolder();
   await renderLibrary();
 });
-els.libSetSelect.addEventListener("change", renderLibrary);
-els.libSearch.addEventListener("input", () => {
+els.libSetSelect?.addEventListener("change", renderLibrary);
+
+els.libSearch?.addEventListener("input", () => {
   clearTimeout(window.__libT);
   window.__libT = setTimeout(renderLibrary, 120);
 });
-els.libRefreshBtn.onclick = renderLibrary;
+els.libRefreshBtn && (els.libRefreshBtn.onclick = renderLibrary);
 
-els.viewTableBtn.onclick = async () => { setLibView("table"); await setMeta("libView", "table"); };
-els.viewNotebookBtn.onclick = async () => { setLibView("notebook"); await setMeta("libView", "notebook"); await renderNotebook(); };
-els.printNotebookBtn.onclick = () => { setLibView("notebook"); window.print(); };
+els.viewTableBtn && (els.viewTableBtn.onclick = async () => {
+  setLibView("table");
+  await setMeta("libView", "table");
+});
+els.viewNotebookBtn && (els.viewNotebookBtn.onclick = async () => {
+  setLibView("notebook");
+  await setMeta("libView", "notebook");
+  await renderNotebook();
+});
+els.printNotebookBtn && (els.printNotebookBtn.onclick = () => {
+  setLibView("notebook");
+  window.print();
+});
 
 // Backup
-els.exportBtn.onclick = async () => {
+els.exportBtn && (els.exportBtn.onclick = async () => {
   const payload = await exportAll();
   const name = `my-vocab-backup-${new Date().toISOString().slice(0,10)}.json`;
   downloadJSON(payload, name);
-  els.backupMsg.textContent = "已匯出 ✅";
-  setTimeout(() => (els.backupMsg.textContent = ""), 1000);
-};
+  if (els.backupMsg) {
+    els.backupMsg.textContent = "已匯出 ✅";
+    setTimeout(() => (els.backupMsg.textContent = ""), 1000);
+  }
+});
 
-els.importBtn.onclick = async () => {
-  const f = els.importFile.files?.[0];
+els.importBtn && (els.importBtn.onclick = async () => {
+  const f = els.importFile?.files?.[0];
   if (!f) return;
   try {
     const text = await f.text();
     const payload = JSON.parse(text);
     await importAll(payload);
-    els.backupMsg.textContent = "匯入完成 ✅";
+    if (els.backupMsg) els.backupMsg.textContent = "匯入完成 ✅";
     await init();
     setTimeout(() => (els.backupMsg.textContent = ""), 1200);
   } catch {
-    els.backupMsg.textContent = "匯入失敗：請確認 JSON 格式";
+    if (els.backupMsg) els.backupMsg.textContent = "匯入失敗：請確認 JSON 格式";
   }
-};
+});
 
 // Shortcuts
 document.addEventListener("keydown", async (e) => {
@@ -768,22 +963,21 @@ document.addEventListener("keydown", async (e) => {
   if (e.key === "3") return rateCurrent(3);
 });
 
-/** ===== init ===== */
+// ---------- init ----------
 async function init() {
   await hydrateSelectors();
 
-  // 預設：Study folder=all, set=all
-  if (!els.studyFolderSelect.value) els.studyFolderSelect.value = "all";
-  if (!els.studySetSelect.value) els.studySetSelect.value = "all";
-
-  // Add 預設 set 的考試資訊
-  const s = (await getAllSets()).find(x => x.id === els.addSetSelect.value);
-  els.examTitle.value = s?.examTitle || "";
-  els.examDate.value = s?.examDate || "";
+  // add set exam preload
+  if (els.addSetSelect?.value) {
+    const s = (await getAllSets()).find(x => x.id === els.addSetSelect.value);
+    if (els.examTitle) els.examTitle.value = s?.examTitle || "";
+    if (els.examDate) els.examDate.value = s?.examDate || "";
+  }
 
   await refreshStats();
   await loadDue({ useSavedSession: true });
   await renderLibrary();
+  await renderHomeCards();
   setupSwipe();
 }
 

@@ -38,46 +38,6 @@ body{
   padding: 26px 18px 70px;
 }
 
-/* ===== Study Card Flip ===== */
-
-.card {
-  perspective: 1200px;
-  border: none;
-  background: none;
-  cursor: pointer;
-}
-
-.cardInner {
-  position: relative;
-  width: 100%;
-  min-height: 260px;
-  transform-style: preserve-3d;
-  transition: transform 0.6s ease;
-}
-
-.card.is-flipped .cardInner {
-  transform: rotateY(180deg);
-}
-
-.cardFace {
-  position: absolute;
-  inset: 0;
-  backface-visibility: hidden;
-  background: #fff;
-  border-radius: 20px;
-  padding: 28px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.cardBack {
-  transform: rotateY(180deg);
-}
-
-
 /* ============ Topbar ============ */
 .topbar{
   position: sticky;
@@ -410,44 +370,6 @@ input::placeholder{ color: #9aa4b2; font-weight: 600; }
   color: var(--muted);
 }
 
-.flashcard{
-  width: 100%;
-  border: 1px solid rgba(148,163,184,.22);
-  background: #fff;
-  border-radius: 22px;
-  padding: 0;
-  cursor:pointer;
-  box-shadow: 0 22px 55px rgba(15,23,42,.07);
-  overflow:hidden;
-  position: relative;
-}
-.flashcardInner{
-  position: relative;
-  width: 100%;
-  min-height: 320px;
-  transform-style: preserve-3d;
-  transition: transform .45s ease;
-}
-.flashcard.is-flipped .flashcardInner{
-  transform: rotateY(180deg);
-}
-
-.face{
-  position:absolute;
-  inset:0;
-  display:flex;
-  flex-direction: column;
-  align-items:center;
-  justify-content:center;
-  padding: 26px;
-  backface-visibility: hidden;
-}
-.face.back{
-  transform: rotateY(180deg);
-  background: radial-gradient(500px 200px at 50% -60px, rgba(63,91,255,.14), transparent 60%),
-              #fff;
-}
-
 .big{
   font-size: 56px;
   font-weight: 1000;
@@ -657,3 +579,63 @@ dialog::backdrop{
     font-weight: 500;
   }
 }
+
+/* ===============================
+   Study Flashcard 翻牌（最終正確版）
+   =============================== */
+
+.flashcard {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  border-radius: 22px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  perspective: 1200px;
+}
+
+/* 正反面共用 */
+.flashcard .front,
+.flashcard .back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 22px;
+  background: #fff;
+  padding: 28px;
+  box-shadow: 0 22px 55px rgba(15,23,42,.07);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  transition: transform 0.55s cubic-bezier(.4,.2,.2,1);
+}
+
+/* 正面 */
+.flashcard .front {
+  transform: rotateY(0deg);
+}
+
+/* 背面（預設翻到後面） */
+.flashcard .back {
+  transform: rotateY(180deg);
+  background: radial-gradient(
+      500px 200px at 50% -60px,
+      rgba(63,91,255,.14),
+      transparent 60%
+    ),
+    #fff;
+}
+
+/* 翻牌狀態（JS 已正確加 is-flipped） */
+.flashcard.is-flipped .front {
+  transform: rotateY(-180deg);
+}
+
+.flashcard.is-flipped .back {
+  transform: rotateY(0deg);
+}
+

@@ -26,23 +26,35 @@ body{
 
 a{ color:inherit; }
 button, input, select, textarea{ font:inherit; }
+img{ max-width:100%; display:block; }
 
 .container{
   max-width: var(--container);
   margin: 0 auto;
-  padding: 22px 16px 60px;
+  padding: 18px 16px 64px;
 }
 
+/* =========================
+   Topbar
+   ========================= */
 .topbar{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(246,247,251,.86);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(226,232,240,.85);
+}
+
+.topbar-inner{
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 14px 16px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:12px;
-  padding: 14px 16px;
-  background: var(--card);
-  border:1px solid var(--border);
-  border-radius: var(--radius2);
-  box-shadow: var(--shadow);
+  flex-wrap:wrap;
 }
 
 .brand{
@@ -58,34 +70,20 @@ button, input, select, textarea{ font:inherit; }
   color:#fff;
   font-weight:900;
 }
-.brand h1{
+.title{
   margin:0;
   font-size:18px;
   font-weight:900;
+  line-height:1.1;
 }
-.sub{
+.subtitle{
   color:var(--muted);
   font-size:13px;
   margin-top:2px;
+  font-weight:700;
 }
-
-.badge{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding: 6px 10px;
-  border-radius:999px;
-  border:1px solid var(--border);
-  color:var(--muted);
-  background:#fff;
-  font-size:12px;
-  font-weight:800;
-}
-.badge.blue{ background: var(--primarySoft); border-color: rgba(66,85,255,.25); color:var(--text); }
-.badge.red{ background:#fff1f2; border-color:#fecdd3; color:#7f1d1d; }
 
 .tabs{
-  margin-top: 14px;
   display:flex;
   gap:10px;
   flex-wrap:wrap;
@@ -105,7 +103,10 @@ button, input, select, textarea{ font:inherit; }
   color: var(--text);
 }
 
-.panel{ margin-top: 16px; }
+/* =========================
+   Layout helpers
+   ========================= */
+.panel{ margin-top: 18px; }
 
 .card{
   background: var(--card);
@@ -116,7 +117,9 @@ button, input, select, textarea{ font:inherit; }
 }
 
 h2{ margin:0 0 12px; font-size: 20px; }
-.hint{ color:var(--muted); font-size:13px; }
+h3{ margin:0; font-size: 16px; }
+.hint{ color:var(--muted); font-size:13px; font-weight:700; }
+.muted{ color: var(--muted); }
 
 .row{ display:flex; gap:12px; align-items:center; }
 .row.between{ justify-content:space-between; }
@@ -125,7 +128,8 @@ h2{ margin:0 0 12px; font-size: 20px; }
 .gap{ gap: 12px; }
 
 .field{ display:flex; flex-direction:column; gap:6px; min-width: 220px; }
-label{ color: var(--muted); font-size: 12px; font-weight: 800; }
+label{ color: var(--muted); font-size: 12px; font-weight: 900; }
+
 input, select, textarea{
   border:1px solid var(--border);
   background:#fff;
@@ -160,48 +164,233 @@ input:focus, select:focus, textarea:focus{
   background:#fff;
   color: var(--text);
 }
-.btn.danger{ color:var(--danger); border-color:#fecaca; background:#fff; }
+.btn.danger{
+  color:var(--danger);
+  border-color:#fecaca;
+  background:#fff;
+}
 
-.mini{ padding: 8px 10px; border-radius: 12px; font-size: 13px; }
+.msg{
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
 
-/* Home cards */
+.hr{
+  border:0;
+  border-top:1px solid var(--border);
+  margin: 16px 0;
+}
+
+/* grid helpers used in Add/Dialogs */
+.grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+@media (max-width: 860px){
+  .grid{ grid-template-columns: 1fr; }
+  .field{ min-width: 0; }
+}
+.span2{ grid-column: span 2; }
+@media (max-width: 860px){
+  .span2{ grid-column: span 1; }
+}
+
+/* =========================
+   Home (Folder/Set cards)
+   ========================= */
 .cardsWrap{
   display:grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
-@media (max-width: 960px){ .cardsWrap{ grid-template-columns: 1fr; } }
-
-.folderBar{
-  display:flex; align-items:center; justify-content:space-between;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: #fafafa;
+@media (max-width: 960px){
+  .cardsWrap{ grid-template-columns: 1fr; }
 }
-.folderTitle{ font-weight: 1000; }
-.folderMeta{ color: var(--muted); font-size: 13px; }
 
 .setCard{
   border: 1px solid var(--border);
   background: #fff;
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 14px;
   box-shadow: var(--shadow);
   cursor: pointer;
-  transition: transform .12s ease, box-shadow .12s ease;
+  transition: transform .12s ease;
 }
 .setCard:hover{ transform: translateY(-2px); }
-.setTop{ display:flex; justify-content:space-between; gap:10px; }
+
+.setTop{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
 .setName{ font-weight: 1000; font-size: 16px; }
+
 .badges{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
-.cardStats{ display:flex; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 13px; flex-wrap:wrap; }
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding: 6px 10px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  color:var(--muted);
+  background:#fff;
+  font-size:12px;
+  font-weight:900;
+}
+.badge.blue{ background: var(--primarySoft); border-color: rgba(66,85,255,.25); color:var(--text); }
+.badge.red{ background:#fff1f2; border-color:#fecdd3; color:#7f1d1d; }
+
+.cardStats{
+  display:flex;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  flex-wrap:wrap;
+}
 .cardActions{ display:flex; gap: 10px; margin-top: 12px; }
 .cardActions .btn{ flex:1; }
 
-/* Table */
-table{ width:100%; border-collapse:separate; border-spacing:0; overflow:hidden; border-radius: 16px; border:1px solid var(--border); }
+/* =========================
+   Study (flashcard)
+   ========================= */
+#tab-study{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius2);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.todayBox{
+  margin-top: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.todayText{ font-weight: 900; }
+.todayText.muted{ color: var(--muted); font-weight: 800; }
+
+.bar{
+  margin-top: 10px;
+  height: 10px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.barFill{
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+}
+
+.empty{
+  margin-top: 14px;
+  color: var(--muted);
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: #fff;
+  font-weight: 700;
+}
+
+.review{
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+  max-width: 560px;
+}
+
+.progress{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--primarySoft);
+  border: 1px solid rgba(66,85,255,.25);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.flashcard{
+  width: 560px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 22px 18px;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* 重要：讓正面/背面不要同時顯示 */
+.flashcard .front,
+.flashcard .back{
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+  align-items:center;
+  justify-content:center;
+  min-height: 220px;
+}
+
+.flashcard .back{ display:none; }
+
+/* JS 通常會切換 is-flipped */
+.flashcard.is-flipped .front{ display:none; }
+.flashcard.is-flipped .back{ display:flex; }
+
+.big{
+  font-size: 44px;
+  font-weight: 1000;
+  letter-spacing: -0.02em;
+}
+.big2{
+  font-size: 40px;
+  font-weight: 1000;
+  letter-spacing: -0.02em;
+}
+
+.meta{ color: var(--muted); font-weight: 800; }
+.tap{ color: var(--muted); font-size: 12px; font-weight: 900; margin-top: 6px; }
+
+.rateRow{
+  display:flex;
+  gap: 10px;
+  justify-content: center;
+}
+.rateRow .btn{ min-width: 110px; }
+
+/* =========================
+   Library (table + notebook)
+   ========================= */
+.tableWrap{ margin-top: 14px; }
+
+table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  overflow:hidden;
+  border-radius: 16px;
+  border:1px solid var(--border);
+  background:#fff;
+}
+
 thead th{
   text-align:left;
   font-size: 12px;
@@ -214,22 +403,85 @@ thead th{
 tbody td{
   padding: 12px;
   border-bottom:1px solid var(--border);
+  vertical-align: top;
 }
 tbody tr:last-child td{ border-bottom:none; }
 
-.empty{
-  color: var(--muted);
-  padding: 14px;
-  border: 1px dashed var(--border);
-  border-radius: 14px;
-  background: #fff;
+.notebook{
+  margin-top: 14px;
+  display:grid;
+  gap: 12px;
 }
 
-/* Notebook */
-.nbHeader{ display:flex; justify-content:space-between; gap:12px; margin-bottom: 10px; }
-.nbTitle{ font-weight: 1000; font-size: 16px; }
-.nbSub{ color: var(--muted); font-size: 12px; }
-.nbSection{ margin-top: 14px; }
-.nbSectionTitle{ font-weight: 1000; margin-bottom: 8px; }
-.nbExam{ color: var(--muted); font-size: 12px; margin-bottom: 10px; }
-.nbTable{ box-shadow:none; }
+.nbCard{
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+.nbHeader{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+}
+.nbTitle{
+  font-weight: 1000;
+  font-size: 16px;
+}
+.nbSub{
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.nbExam{
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.nbList{
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow:hidden;
+}
+.nbRow{
+  display:grid;
+  grid-template-columns: 1.2fr .6fr 1.2fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom:1px solid var(--border);
+}
+.nbRow:last-child{ border-bottom:none; }
+.nbTerm{ font-weight: 1000; }
+.nbPos{ color: var(--muted); font-weight: 800; }
+.nbDef{ font-weight: 800; }
+
+@media (max-width: 720px){
+  .nbRow{ grid-template-columns: 1fr; }
+}
+
+/* =========================
+   Dialog (edit modal)
+   ========================= */
+dialog.dialog{
+  border: none;
+  padding: 0;
+  width: min(760px, calc(100vw - 24px));
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+dialog::backdrop{
+  background: rgba(15,23,42,.35);
+  backdrop-filter: blur(2px);
+}
+
+.dialogCard{
+  background:#fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px;
+}

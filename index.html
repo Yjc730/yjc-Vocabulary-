@@ -74,4 +74,172 @@
             <div class="meta" id="tagsOut"></div>
             <div class="tap">點一下回到題目</div>
           </div>
-        </
+        </button>
+
+        <div class="rateRow">
+          <button class="btn btn-soft rate" data-score="1" type="button">不熟</button>
+          <button class="btn btn-ghost rate" data-score="2" type="button">普通</button>
+          <button class="btn btn-primary rate" data-score="3" type="button">熟</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Add -->
+    <section id="tab-add" class="panel hidden">
+      <div class="row between">
+        <h2>Add</h2>
+        <div class="hint">建議：term + 中文 + 例句（可空）</div>
+      </div>
+
+      <div class="row wrap gap">
+        <div class="field grow">
+          <label>Set</label>
+          <select id="addSetSelect"></select>
+        </div>
+
+        <div class="field grow">
+          <label>新增 Set</label>
+          <div class="row gap">
+            <input id="newSetName" placeholder="例如 TOEIC / 生物 / 新聞" />
+            <button id="createSetBtn" class="btn btn-ghost" type="button">建立</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label>term</label>
+          <input id="term" placeholder="catabolism" />
+        </div>
+        <div class="field">
+          <label>詞性</label>
+          <input id="pos" placeholder="n." />
+        </div>
+        <div class="field">
+          <label>中文</label>
+          <input id="definition" placeholder="分解代謝" />
+        </div>
+        <div class="field">
+          <label>例句（可空）</label>
+          <input id="example" placeholder="During fasting, catabolism increases." />
+        </div>
+        <div class="field span2">
+          <label>tags（逗號分隔）</label>
+          <input id="tags" placeholder="bio, exam" />
+        </div>
+      </div>
+
+      <div class="row gap">
+        <button id="addBtn" class="btn btn-primary" type="button">加入</button>
+        <div class="msg" id="addMsg"></div>
+      </div>
+    </section>
+
+    <!-- Library -->
+    <section id="tab-library" class="panel hidden">
+      <div class="row between">
+        <h2>Library</h2>
+        <div class="hint">搜尋 / 編輯 / 刪除</div>
+      </div>
+
+      <div class="row wrap gap">
+        <div class="field">
+          <label>Set</label>
+          <select id="libSetSelect"></select>
+        </div>
+        <div class="field grow">
+          <label>搜尋</label>
+          <input id="libSearch" placeholder="輸入 term / 中文 / tag…" />
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button id="libRefreshBtn" class="btn btn-ghost" type="button">刷新</button>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>term</th>
+              <th>中文</th>
+              <th>例句</th>
+              <th>tags</th>
+              <th>下次到期</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="libBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Edit Modal -->
+      <dialog id="editDialog" class="dialog">
+        <form method="dialog" class="dialogCard">
+          <div class="row between">
+            <h3>編輯單字</h3>
+            <button class="btn btn-ghost" value="cancel" type="submit">關閉</button>
+          </div>
+
+          <input type="hidden" id="editId" />
+
+          <div class="grid">
+            <div class="field">
+              <label>term</label>
+              <input id="editTerm" />
+            </div>
+            <div class="field">
+              <label>詞性</label>
+              <input id="editPos" />
+            </div>
+            <div class="field">
+              <label>中文</label>
+              <input id="editDef" />
+            </div>
+            <div class="field">
+              <label>例句</label>
+              <input id="editEx" />
+            </div>
+            <div class="field span2">
+              <label>tags（逗號分隔）</label>
+              <input id="editTags" />
+            </div>
+          </div>
+
+          <div class="row gap">
+            <button id="saveEditBtn" class="btn btn-primary" value="ok" type="button">儲存</button>
+            <div class="msg" id="editMsg"></div>
+          </div>
+        </form>
+      </dialog>
+    </section>
+
+    <!-- Backup -->
+    <section id="tab-backup" class="panel hidden">
+      <div class="row between">
+        <h2>Backup</h2>
+        <div class="hint">匯出/匯入 JSON（換電腦也不怕）</div>
+      </div>
+
+      <div class="row wrap gap">
+        <button id="exportBtn" class="btn btn-primary" type="button">匯出 JSON</button>
+
+        <div class="field grow">
+          <label>匯入 JSON</label>
+          <input id="importFile" type="file" accept="application/json" />
+        </div>
+
+        <button id="importBtn" class="btn btn-soft" type="button">開始匯入</button>
+        <div class="msg" id="backupMsg"></div>
+      </div>
+
+      <div class="empty">
+        建議：每週匯出一次 JSON 存到雲端硬碟。
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

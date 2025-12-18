@@ -8,12 +8,17 @@ const els = {
   addBtn: $("addBtn"), addMsg: $("addMsg"),
   stats: $("stats"),
   reloadBtn: $("reloadBtn"),
+
   reviewBox: $("reviewBox"),
   empty: $("empty"),
-  front: $("front"), sub: $("sub"),
-  flipBtn: $("flipBtn"),
-  backBox: $("backBox"),
-  back: $("back"), exampleOut: $("exampleOut"), tagsOut: $("tagsOut"),
+
+  progressText: $("progressText"),
+  cardBtn: $("cardBtn"),
+  front: $("front"),
+  sub: $("sub"),
+  back: $("back"),
+  exampleOut: $("exampleOut"),
+  tagsOut: $("tagsOut"),
 };
 
 let dueList = [];
@@ -28,36 +33,15 @@ function nowISO() {
   return new Date().toISOString();
 }
 
+function isTyping() {
+  const el = document.activeElement;
+  return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+}
+
 async function refreshStats() {
   const total = await getAllCount();
   const due = (await getDueWords(nowISO())).length;
   els.stats.textContent = `總單字：${total}｜今日到期：${due}`;
-}
-
-function render() {
-  if (!dueList.length) {
-    els.reviewBox.classList.add("hidden");
-    els.empty.classList.remove("hidden");
-    return;
-  }
-  els.reviewBox.classList.remove("hidden");
-  els.empty.classList.add("hidden");
-
-  const w = dueList[idx];
-  els.front.textContent = w.term;
-  els.sub.textContent = `${w.pos || ""} ${w.definition ? "— 先想意思再翻面" : ""}`.trim();
-
-  els.back.textContent = w.definition || "";
-  els.exampleOut.textContent = w.example ? `例句：${w.example}` : "";
-  els.tagsOut.textContent = (w.tags && w.tags.length) ? `Tags：${w.tags.join(", ")}` : "";
-
-  if (flipped) {
-    els.backBox.classList.remove("hidden");
-    els.flipBtn.classList.add("hidden");
-  } else {
-    els.backBox.classList.add("hidden");
-    els.flipBtn.classList.remove("hidden");
-  }
 }
 
 async function saveSession() {
@@ -67,13 +51,40 @@ async function saveSession() {
 async function loadSession() {
   const s = await getMeta("lastSession");
   if (!s) return;
-  // 如果今天到期清單變了，idx 可能超出，render 時會修正
   idx = Number.isFinite(s.idx) ? s.idx : 0;
   flipped = !!s.flipped;
 }
 
-async function loadDue() {
+function render() {
+  if (!dueList.length) {
+    els.reviewBox.classList.add("hidden");
+    els.empty.classList.remove("hidden");
+    return;
+  }
+
+  els.reviewBox.classList.remove("hidden");
+  els.empty.classList.add("hidden");
+
+  if (idx >= dueList.length) idx = 0;
+
+  const w = dueList[idx];
+
+  els.progressText.textContent = `${idx + 1} / ${dueList.length}`;
+
+  els.front.textContent = w.term;
+  els.sub.textContent = w.pos ? `${w.pos}` : "";
+
+  els.back.textContent = w.definition || "";
+  els.exampleOut.textContent = w.example ? `例句：${w.example}` : "";
+  els.tagsOut.textContent = (w.tags && w.tags.length) ? `Tags：${w.tags.join(", ")}` : "";
+
+  if (flipped) els.cardBtn.classList.add("is-flipped");
+  else els.cardBtn.classList.remove("is-flipped");
+}
+
+async function loadDue({ useSavedSession = true } = {}) {
   dueList = await getDueWords(nowISO());
+
   if (!dueList.length) {
     idx = 0;
     flipped = false;
@@ -83,10 +94,27 @@ async function loadDue() {
     return;
   }
 
-  await loadSession();
-  if (idx >= dueList.length) idx = 0; // 防呆
+  if (useSavedSession) {
+    await loadSession();
+  }
+
+  if (idx >= dueList.length) idx = 0;
   render();
   await refreshStats();
+}
+
+async function rateCurrent(score) {
+  if (!dueList.length) return;
+
+  const w = dueList[idx];
+  const next = nextSRSState(w, score);
+  await updateWord(w.id, next);
+
+  flipped = false;
+
+  // 更新後重新抓 due（因為這張卡會被排到未來，可能從清單消失）
+  await loadDue({ useSavedSession: false });
+  await saveSession();
 }
 
 els.addBtn.onclick = async () => {
@@ -101,12 +129,11 @@ els.addBtn.onclick = async () => {
     example: els.example.value.trim(),
     tags: els.tags.value.split(",").map(s => s.trim()).filter(Boolean),
 
-    // 初始 SRS：今天就到期（新增後可立刻複習）
     repetitions: 0,
     intervalDays: 0,
     ease: 2.3,
     lastReviewedAt: null,
-    dueAt: nowISO(),
+    dueAt: nowISO(),       // 新增後立刻可複習
     createdAt: nowISO(),
   };
 
@@ -114,12 +141,13 @@ els.addBtn.onclick = async () => {
 
   els.addMsg.textContent = `已加入：${term}`;
   els.term.value = els.pos.value = els.definition.value = els.example.value = els.tags.value = "";
-  await loadDue();
+  await loadDue({ useSavedSession: true });
+
   setTimeout(() => (els.addMsg.textContent = ""), 1200);
 };
 
-els.flipBtn.onclick = async () => {
-  flipped = true;
+els.cardBtn.onclick = async () => {
+  flipped = !flipped;
   await saveSession();
   render();
 };
@@ -127,28 +155,35 @@ els.flipBtn.onclick = async () => {
 els.reloadBtn.onclick = async () => {
   idx = 0;
   flipped = false;
-  await setMeta("lastSession", { idx, flipped, ts: nowISO() });
-  await loadDue();
+  await saveSession();
+  await loadDue({ useSavedSession: true });
 };
 
+// 點按評分
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest(".rate");
   if (!btn) return;
-
   const score = Number(btn.dataset.score);
-  const w = dueList[idx];
-  const next = nextSRSState(w, score);
-
-  await updateWord(w.id, next);
-
-  // 下一張
-  flipped = false;
-  // 重新取 today due（因為剛剛那張可能被排到未來）
-  await loadDue();
-
-  // 如果 dueList 還有，保持 idx 不變（等於「吃掉當前卡」）
-  // 因為 loadDue 會用 lastSession 的 idx，所以我們手動保存最新 idx
-  await setMeta("lastSession", { idx: Math.min(idx, Math.max(0, dueList.length - 1)), flipped, ts: nowISO() });
+  await rateCurrent(score);
 });
 
-await loadDue();
+// 快捷鍵：空白翻面｜1 還不熟(=1)｜2 我會了(=3)
+document.addEventListener("keydown", async (e) => {
+  if (isTyping()) return;
+
+  if (e.key === " ") {
+    e.preventDefault();
+    flipped = !flipped;
+    await saveSession();
+    render();
+    return;
+  }
+  if (e.key === "1") return rateCurrent(1);
+  if (e.key === "2") return rateCurrent(3);
+
+  // 額外：0/3 對應更多選項（可留著）
+  if (e.key === "0") return rateCurrent(0);
+  if (e.key === "3") return rateCurrent(2);
+});
+
+await loadDue({ useSavedSession: true });

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Vocab SRS</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="row">
+      <h1>My Vocab SRS</h1>
+      <div class="muted" id="stats"></div>
+    </header>
+
+    <section class="card">
+      <h2>新增單字</h2>
+      <div class="grid">
+        <input id="term" placeholder="term (e.g., catabolism)" />
+        <input id="pos" placeholder="pos (e.g., n.)" />
+        <input id="definition" placeholder="中文意思" />
+        <input id="example" placeholder="例句（可空）" />
+        <input id="tags" placeholder="tags（用逗號分隔，可空）" />
+      </div>
+      <button id="addBtn">加入</button>
+      <div class="muted" id="addMsg"></div>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <h2>今日到期複習</h2>
+        <button id="reloadBtn" class="ghost">重新載入今日清單</button>
+      </div>
+
+      <div id="reviewBox" class="reviewBox hidden">
+        <div class="big" id="front"></div>
+        <div class="muted" id="sub"></div>
+
+        <button id="flipBtn">顯示答案</button>
+
+        <div id="backBox" class="hidden">
+          <div class="back">
+            <div id="back"></div>
+            <div class="muted" id="exampleOut"></div>
+            <div class="muted" id="tagsOut"></div>
+          </div>
+
+          <div class="row gap">
+            <button class="rate" data-score="0">0 忘了</button>
+            <button class="rate" data-score="1">1 很不熟</button>
+            <button class="rate" data-score="2">2 還行</button>
+            <button class="rate" data-score="3">3 很熟</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="empty" class="muted">今天沒有到期單字 🎉</div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

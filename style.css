@@ -604,3 +604,16 @@ dialog::backdrop{
   }
   .nb-zh{ color:#000 !important; }
 }
+
+/* ===== 列印修正：確保中文顯示 ===== */
+@media print {
+  .nbTable td,
+  .nbTable th {
+    color: #000 !important;
+    opacity: 1 !important;
+  }
+
+  .nbTable td:nth-child(3) {
+    font-weight: 500;
+  }
+}
